@@ -15,5 +15,8 @@
     "hardhat": "^3.0.12",
     "mocha": "^11.7.5",
     "typescript": "~5.8.0"
+  },
+  "dependencies": {
+    "openzeppelin-solidity": "github:OpenZeppelin/openzeppelin-contracts"
   }
 }

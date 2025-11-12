@@ -1,22 +1,22 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-contract Voting {
+import "openzeppelin-solidity/contracts/access/Ownable.sol";
+
+contract Voting is Ownable {
     enum VotingState { Pending, Active, Closed }
     VotingState public state;
-    address public admin;
     
     struct Voter {
         uint votedCandidate;
-        string name;
         bool hasVoted;   
         bool isRegistered;
     }
 
     struct Candidate {
         uint candidateID;
-        string name;
         uint totalVote;
+        bool isRegistered;
     }
 
     mapping(address => Voter) public voters;
@@ -24,53 +24,47 @@ contract Voting {
 
     address[] public candidateAddresses;
 
-    constructor() {
-        admin = msg.sender;
+    constructor() Ownable(msg.sender) {
         state = VotingState.Pending;
     }
 
-    modifier onlyAdmin {
-        require(msg.sender == admin, "Only Admin!");
-        _;
-    }
 
-    event registerVoterSuccess(address indexed admin, address indexed voter, string name);
-    event registerCandidateSuccess(address indexed admin, address indexed candidate, string name);
+    event registerVoterSuccess(address indexed admin, address indexed voter);
+    event registerCandidateSuccess(address indexed admin, address indexed candidate);
     event castVoteSuccess(address indexed voter, uint indexed candidateVoted);
     event VotingStarted(address indexed admin);
     event VotingEnded(address indexed admin);
 
-    function registerVoter(address _voterAdd, string memory _name) external onlyAdmin {
+    function registerVoter(address _voterAdd) external onlyOwner {
         require(state == VotingState.Pending, "Vote already start!");
         require(!voters[_voterAdd].isRegistered, "Voter already registered!");
         require(_voterAdd != address(0), "Address invalid!");
 
         voters[_voterAdd] = Voter({
             votedCandidate: 0,
-            name: _name,
             hasVoted: false,
             isRegistered: true
         });
 
-        emit registerVoterSuccess(msg.sender, _voterAdd, _name);
+        emit registerVoterSuccess(msg.sender, _voterAdd);
     }
 
-    function registerCandidate(address _candidateAdd, string memory _name) external onlyAdmin {
+    function registerCandidate(address _candidateAdd) external onlyOwner {
         require(state == VotingState.Pending, "Vote already start!");
-        require(bytes(candidates[_candidateAdd].name).length == 0, "Candidate already registered!");
+        require(!candidates[_candidateAdd].isRegistered, "Candidate already registered!");
         require(!voters[_candidateAdd].isRegistered, "Voter cannot be a candidate!");
         require(_candidateAdd != address(0), "Address invalid!");
 
         uint newID = candidateAddresses.length;
         candidates[_candidateAdd] = Candidate({
             candidateID: newID,
-            name: _name,
-            totalVote: 0
+            totalVote: 0,
+            isRegistered: true
         });
 
         candidateAddresses.push(_candidateAdd);
 
-        emit registerCandidateSuccess(msg.sender, _candidateAdd, _name);
+        emit registerCandidateSuccess(msg.sender, _candidateAdd);
     }
 
     function castVote(uint candidateId) external {
@@ -87,48 +81,71 @@ contract Voting {
         emit castVoteSuccess(msg.sender, candidateId);
     }
 
-    function startVoting() external onlyAdmin {
+    function startVoting() external onlyOwner {
         require(state == VotingState.Pending, "Voting already started or closed!");
         state = VotingState.Active;
 
         emit VotingStarted(msg.sender);
     }
 
-    function closeVoting() external onlyAdmin {
+    function closeVoting() external onlyOwner {
         require(state == VotingState.Active, "Voting not active!");
         state = VotingState.Closed;
         emit VotingEnded(msg.sender);
     }
 
-    function showProgress() external view returns(uint[] memory, uint[] memory) {
-        uint totalCandidates = candidateAddresses.length;
-        uint[] memory candidateIds = new uint[](totalCandidates);
-        uint[] memory total = new uint[](totalCandidates);
+    function showProgress(uint _offset, uint _limit) external view returns(uint[] memory, uint[] memory) {
+        require(_limit > 0, "Limit must be greater than zero!");
+        require(state == VotingState.Active, "Voting not active!");
 
-        for(uint i = 0; i < totalCandidates; i++) {
+        uint totalCandidates = candidateAddresses.length;
+        uint endIndex = _offset + _limit;
+
+        if(endIndex > totalCandidates) {
+            endIndex = totalCandidates;
+        }
+
+        uint actualSize = endIndex - _offset;
+        uint[] memory candidateIds = new uint[](actualSize);
+        uint[] memory total = new uint[](actualSize);
+
+        uint j = 0;
+        for(uint i = _offset; i < endIndex; i++) {
             address candidateAddr = candidateAddresses[i];
-            candidateIds[i] = candidates[candidateAddr].candidateID;
-            total[i] = candidates[candidateAddr].totalVote;
+            candidateIds[j] = candidates[candidateAddr].candidateID;
+            total[j] = candidates[candidateAddr].totalVote;
+
+            j++;
         } 
 
         return (candidateIds, total);
     }
 
-    function showResult() external view returns (uint[] memory, string[] memory, uint[] memory) {
+    function showResult(uint _offset, uint _limit) external view returns (uint[] memory, uint[] memory) {
+        require(_limit > 0, "Limit must be greater than zero!");
         require(state == VotingState.Closed, "Voting not closed yet!");
         
         uint totalCandidates = candidateAddresses.length;
-        uint[] memory candidateIds = new uint[](totalCandidates);
-        string[] memory candidateNames = new string[](totalCandidates);
-        uint[] memory votes = new uint[](totalCandidates);
+        uint endIndex = _offset + _limit;
 
-        for(uint i = 0; i < totalCandidates; i++) {
-            address candidateAddr = candidateAddresses[i];
-            candidateIds[i] = candidates[candidateAddr].candidateID;
-            candidateNames[i] = candidates[candidateAddr].name;
-            votes[i] = candidates[candidateAddr].totalVote;
+        if(endIndex > totalCandidates) {
+            endIndex = totalCandidates;
         }
 
-        return (candidateIds, candidateNames, votes);
+        uint actualSize = endIndex - _offset;
+        uint[] memory candidateIds = new uint[](actualSize);
+        uint[] memory votes = new uint[](actualSize);
+
+        uint j = 0;
+        
+        for(uint i = _offset; i < endIndex; i++) {
+            address candidateAddr = candidateAddresses[i];
+            candidateIds[j] = candidates[candidateAddr].candidateID;
+            votes[j] = candidates[candidateAddr].totalVote;
+
+            j++;
+        }
+
+        return (candidateIds, votes);
     }
 }
