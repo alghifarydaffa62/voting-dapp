@@ -1,44 +1,18 @@
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import {BrowserRouter as Router, Routes, Route } from "react-router-dom"
+import Home from '../pages/Home.tsx'
+import Login from '../pages/Login.tsx'
+import Dashboard from '../pages/Dashboard.tsx'
 
 function App() {
-  const account = useAccount()
-  const { connectors, connect, status, error } = useConnect()
-  const { disconnect } = useDisconnect()
-
   return (
     <>
-      <div>
-        <h2 className='text-3xl'>VOTING</h2>
-
-        <div>
-          status: {account.status}
-          <br />
-          addresses: {JSON.stringify(account.addresses)}
-          <br />
-          chainId: {account.chainId}
-        </div>
-
-        {account.status === 'connected' && (
-          <button type="button" onClick={() => disconnect()}>
-            Disconnect
-          </button>
-        )}
-      </div>
-
-      <div>
-        <h2>Connect</h2>
-        {connectors.map((connector) => (
-          <button
-            key={connector.uid}
-            onClick={() => connect({ connector })}
-            type="button"
-          >
-            {connector.name}
-          </button>
-        ))}
-        <div>{status}</div>
-        <div>{error?.message}</div>
-      </div>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home/>}/>
+          <Route path="/Login" element={<Login/>}/>
+          <Route path="/Dashboard" element={<Dashboard/>}/>
+        </Routes>
+      </Router>
     </>
   )
 }
