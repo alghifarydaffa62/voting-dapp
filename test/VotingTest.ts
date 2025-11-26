@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { Contract, Signer } from "ethers";
+import type { Contract, Signer } from "ethers";
 import { network } from "hardhat";
  
 const { ethers } = await network.connect();
