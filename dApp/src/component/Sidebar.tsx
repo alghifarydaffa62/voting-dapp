@@ -1,5 +1,5 @@
 import { useDisconnect } from "wagmi"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, NavLink } from "react-router-dom"
 
 export default function Sidebar() {
     const { disconnect } = useDisconnect()
@@ -15,10 +15,10 @@ export default function Sidebar() {
             <h1 className="text-2xl font-semibold">Voting</h1>
 
             <ul className="flex flex-col gap-3 my-6">
-                <li><a href="">Dashboard</a></li>
-                <li><a href="">Create Voting</a></li>
-                <li><a href="">My Voting</a></li>
-                <li><a href="">Result</a></li>
+                <li><NavLink to="/dashboard" end>Dashboard</NavLink></li>
+                <li><NavLink to="/dashboard/create">Create Voting</NavLink></li>
+                <li><NavLink to="">My Voting</NavLink></li>
+                <li><NavLink to="">Result</NavLink></li>
             </ul>
 
             <button 
