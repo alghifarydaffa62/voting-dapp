@@ -11,10 +11,42 @@ describe("Voting Testing", function () {
   let addr1: Signer;
   let addr2: Signer;
 
+  let now: number;
+  let futureTime: number;
+
+  async function getLatestTime(): Promise<number> {
+    const blockNum = await ethers.provider.getBlockNumber();
+    const block = await ethers.provider.getBlock(blockNum);
+    if (!block) throw new Error("Block not found");
+    return block.timestamp;
+  }
+
+  async function increaseTime(seconds: number) {
+    await ethers.provider.send("evm_increaseTime", [seconds]);
+    await ethers.provider.send("evm_mine", []);
+  }
+
   beforeEach(async () => {
     Voting = await ethers.getContractFactory("Voting");
     [owner, addr1, addr2] = await ethers.getSigners();
-    voting = await Voting.deploy();
+    voting = await Voting.deploy("ipfs://QmDummyHash123");
+  })
+
+  async function startVotingHelper() {
+    now = await getLatestTime()
+    futureTime = now + 3600
+
+    await voting.startVoting(futureTime)
+  }
+
+  describe("deployment", () => {
+    it("Happy Path: Should set the right metadataURI", async () => {
+      expect(await voting.metadataURI()).to.equal("ipfs://QmDummyHash123")
+    })
+
+    it("Happy Path: Should have votingEndTime as 0", async () => {
+      expect(await voting.votingEndTime()).to.equal(0)
+    })
   })
 
   describe("registerVoter", () => {
@@ -45,11 +77,11 @@ describe("Voting Testing", function () {
     })
 
     it("Sad Path: Should REVERT if owner tries to register after voting has started", async () => {
-      await voting.startVoting();
+      await startVotingHelper();
 
       await expect(
         voting.registerVoter(await addr1.getAddress())
-      ).to.be.revertedWith("Vote already start!");
+      ).to.be.revertedWith("Voting has already started!");
     })
   });
 
@@ -90,19 +122,20 @@ describe("Voting Testing", function () {
     })
 
     it("Sad Path: Should REVERT if owner tries to register candidate after voting has started", async () => {
-      await voting.startVoting();
+      await startVotingHelper();
 
       await expect(
         voting.registerCandidate(await addr1.getAddress())
-      ).to.be.revertedWith("Vote already start!");
+      ).to.be.revertedWith("Voting has already started!");
     })
   })
   
   describe("Cast Voting", () => {
+    
     it("Happy Path: Should cast a vote successfully", async () => {
       await voting.registerVoter(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
+      await startVotingHelper();
       
       await voting.connect(addr1).castVote(0);
 
@@ -116,7 +149,7 @@ describe("Voting Testing", function () {
 
     it("Sad Path: Should REVERT if unregistered voter tries to cast a vote", async () => {
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
+      await startVotingHelper();
 
       await expect(
         voting.connect(addr1).castVote(0)
@@ -129,24 +162,25 @@ describe("Voting Testing", function () {
 
       await expect(
         voting.connect(addr1).castVote(0)
-      ).to.be.revertedWith("Voting not active!");
+      ).to.be.revertedWith("Voting has not started yet!");
     })
 
     it("Sad Path: Should REVERT if voter tries to vote when voting has ended", async () => {
       await voting.registerVoter(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
-      await voting.closeVoting();
+      await startVotingHelper();
+
+      await increaseTime(4000)
 
       await expect(
         voting.connect(addr1).castVote(0)
-      ).to.be.revertedWith("Voting not active!");
+      ).to.be.revertedWith("Voting has ended!");
     })
 
     it("Sad Path: Should REVERT if voter tries to vote twice", async () => {
       await voting.registerVoter(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
+      await startVotingHelper();
 
       await voting.connect(addr1).castVote(0);
 
@@ -157,64 +191,40 @@ describe("Voting Testing", function () {
 
     it("Sad Path: Should REVERT if voter tries to vote for unregistered candidate", async () => {
       await voting.registerVoter(await addr1.getAddress());
-      await voting.startVoting();
+      await startVotingHelper();
 
       await expect(
-        voting.connect(addr1).castVote(0)
+        voting.connect(addr1).castVote(99)
       ).to.be.revertedWith("Invalid ID!");
     })
   })
 
   describe("start voting", () => {
     it("Happy Path: shoud start voting successfully", async () => {
-      await voting.startVoting();
-      expect(await voting.state()).to.equal(1);
+      const now = await getLatestTime()
+      const endTime = now + 3600;
+
+      await voting.startVoting(endTime);
+      
+      expect(await voting.isVotingStarted()).to.be.true;
+      expect(await voting.votingEndTime()).to.equal(endTime);
     })
 
     it("Sad Path: Should REVERT if non-owner tries to start voting", async () => {
+      const now = await getLatestTime()
       await expect(
-        voting.connect(addr1).startVoting()
+        voting.connect(addr1).startVoting(now + 3600)
       ).to.be.revertedWithCustomError(voting, "OwnableUnauthorizedAccount");
     })
 
     it("Sad Path: Should REVERT owner trying to start voting twice", async () => {
-      await voting.startVoting();
-      
-      await expect(
-        voting.startVoting()
-      ).to.be.revertedWith("Voting already started or closed!");
-    })
-  })
-
-  describe("Close Voting", () => {
-    it("Happy Path: Should be able to close voting successfully", async () => {
-      await voting.startVoting();
-      await voting.closeVoting();
-
-      expect(await voting.state()).to.equal(2);
-    })
-
-    it("Sad Path: Should REVERT if non-owner tries to close voting", async () => {
-      await voting.startVoting();
+      await startVotingHelper();
+      const now = await getLatestTime()
+      const endTime = now + 3600;
 
       await expect(
-        voting.connect(addr1).closeVoting()
-      ).to.be.revertedWithCustomError(voting, "OwnableUnauthorizedAccount");
-    })
-
-    it("Sad Path: Should REVERT if owner tries to close voting before it starts", async () => {
-      await expect(
-        voting.closeVoting()
-      ).to.be.revertedWith("Voting not active!");
-    })
-
-    it("Sad Path: Should REVERT if owner tries to close voting twice", async () => {
-      await voting.startVoting();
-      await voting.closeVoting();
-
-      await expect(
-        voting.closeVoting()
-      ).to.be.revertedWith("Voting not active!");
+        voting.startVoting(endTime)
+      ).to.be.revertedWith("Voting has already started!");
     })
   })
 
@@ -222,8 +232,9 @@ describe("Voting Testing", function () {
     it("Happy Path: Pagination should work", async () => {
       await voting.registerCandidate(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
-      await voting.closeVoting();
+      await startVotingHelper();
+
+      await increaseTime(4000);
 
       const [candidateIds, votes] = await voting.showResult(0, 1);
       expect(candidateIds.length).to.equal(1);
@@ -240,24 +251,24 @@ describe("Voting Testing", function () {
 
       await expect(
         voting.showResult(0, 1)
-      ).to.be.revertedWith("Voting not closed yet!");
+      ).to.be.revertedWith("Voting has not started yet!");
     })
 
     it("Sad Path: Should REVERT if show result called before voting is closed", async () => {
       await voting.registerCandidate(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
+      await startVotingHelper();
 
       await expect(
         voting.showResult(0, 1)
-      ).to.be.revertedWith("Voting not closed yet!");
+      ).to.be.revertedWith("voting is still ongoing!");
     })
 
     it("Sad Path: Should REVERT if limit pagination are zero", async () => {
       await voting.registerCandidate(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
-      await voting.closeVoting();
+      await startVotingHelper();
+      await increaseTime(4000)
 
       await expect(
         voting.showResult(0, 0)
@@ -269,7 +280,7 @@ describe("Voting Testing", function () {
     it("Happy Path: Should show progress successfully", async () => {
       await voting.registerCandidate(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
+      await startVotingHelper();
 
       const [candidateIDs, votes] = await voting.showProgress(0, 1);
       expect(candidateIDs.length).to.equal(1);
@@ -288,25 +299,25 @@ describe("Voting Testing", function () {
 
       await expect(
         voting.showProgress(0, 1)
-      ).to.be.revertedWith("Voting not active!");
+      ).to.be.revertedWith("Voting has not started yet!");
     })
 
     it("Sad Path: Should REVERT if show progress called when voting is closed", async () => {
       await voting.registerCandidate(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
-      await voting.closeVoting();
+      await startVotingHelper();
+      await increaseTime(4000)
 
       await expect(
         voting.showProgress(0, 1)
-      ).to.be.revertedWith("Voting not active!");
+      ).to.be.revertedWith("Voting has ended!");
     })
 
     it("Sad Path: Should REVERT if limit pagination are zero", async () => {
       await voting.registerCandidate(await addr1.getAddress());
       await voting.registerCandidate(await addr2.getAddress());
-      await voting.startVoting();
-
+      await startVotingHelper();
+      
       await expect(
         voting.showProgress(0, 0)
       ).to.be.revertedWith("Limit must be greater than zero!");
