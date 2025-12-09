@@ -3,10 +3,11 @@ pragma solidity ^0.8.28;
 
 import "openzeppelin-solidity/contracts/access/Ownable.sol";
 
-contract Voting is Ownable {
-    enum VotingState { Pending, Active, Closed }
-    VotingState public state;
-    
+contract Voting is Ownable {    
+    string public metadataURI;
+    uint public votingEndTime;
+    bool public isVotingStarted;
+
     struct Voter {
         uint votedCandidate;
         bool hasVoted;   
@@ -21,22 +22,37 @@ contract Voting is Ownable {
 
     mapping(address => Voter) public voters;
     mapping(address => Candidate) public candidates;
-
     address[] public candidateAddresses;
-
-    constructor() Ownable(msg.sender) {
-        state = VotingState.Pending;
-    }
-
 
     event registerVoterSuccess(address indexed admin, address indexed voter);
     event registerCandidateSuccess(address indexed admin, address indexed candidate);
     event castVoteSuccess(address indexed voter, uint indexed candidateVoted);
     event VotingStarted(address indexed admin);
-    event VotingEnded(address indexed admin);
 
-    function registerVoter(address _voterAdd) external onlyOwner {
-        require(state == VotingState.Pending, "Vote already start!");
+    constructor(string memory _metadataURI) Ownable(msg.sender) {
+        metadataURI = _metadataURI;
+        isVotingStarted = false;
+        votingEndTime = 0;
+    }
+
+    modifier onlyPending() {
+        require(!isVotingStarted, "Voting has already started!");
+        _;
+    }
+
+    modifier onlyActive() {
+        require(isVotingStarted, "Voting has not started yet!");
+        require(block.timestamp < votingEndTime, "Voting has ended!");
+        _;
+    }
+
+    modifier onlyEnded() {
+        require(isVotingStarted, "Voting has not started yet!");
+        require(block.timestamp >= votingEndTime, "voting is still ongoing!");
+        _;
+    }
+
+    function registerVoter(address _voterAdd) external onlyOwner onlyPending() {
         require(!voters[_voterAdd].isRegistered, "Voter already registered!");
         require(_voterAdd != address(0), "Address invalid!");
 
@@ -49,8 +65,7 @@ contract Voting is Ownable {
         emit registerVoterSuccess(msg.sender, _voterAdd);
     }
 
-    function registerCandidate(address _candidateAdd) external onlyOwner {
-        require(state == VotingState.Pending, "Vote already start!");
+    function registerCandidate(address _candidateAdd) external onlyOwner onlyPending {
         require(!candidates[_candidateAdd].isRegistered, "Candidate already registered!");
         require(!voters[_candidateAdd].isRegistered, "Voter cannot be a candidate!");
         require(_candidateAdd != address(0), "Address invalid!");
@@ -67,9 +82,17 @@ contract Voting is Ownable {
         emit registerCandidateSuccess(msg.sender, _candidateAdd);
     }
 
-    function castVote(uint candidateId) external {
+    function startVoting(uint _votingEndTime) external onlyOwner onlyPending{
+        require(_votingEndTime > block.timestamp, "Invalid duration!");
+
+        isVotingStarted = true;
+        votingEndTime = _votingEndTime;
+
+        emit VotingStarted(msg.sender);
+    }
+
+    function castVote(uint candidateId) external onlyActive {
         require(voters[msg.sender].isRegistered, "You are not registered!");
-        require(state == VotingState.Active, "Voting not active!");
         require(!voters[msg.sender].hasVoted, "You already vote!");
         require(candidateId < candidateAddresses.length, "Invalid ID!");
 
@@ -81,22 +104,28 @@ contract Voting is Ownable {
         emit castVoteSuccess(msg.sender, candidateId);
     }
 
-    function startVoting() external onlyOwner {
-        require(state == VotingState.Pending, "Voting already started or closed!");
-        state = VotingState.Active;
+    function getVotingStatus() external view returns(string memory) {
+        if(!isVotingStarted) {
+            return "Pending";
+        }
 
-        emit VotingStarted(msg.sender);
+        if(block.timestamp >= votingEndTime) {
+            return "Closed";
+        } else {
+            return "Active";
+        }
     }
 
-    function closeVoting() external onlyOwner {
-        require(state == VotingState.Active, "Voting not active!");
-        state = VotingState.Closed;
-        emit VotingEnded(msg.sender);
+    function getRemainingTime() external view returns (uint256) {
+        if(!isVotingStarted || block.timestamp >= votingEndTime) {
+            return 0;
+        }
+
+        return votingEndTime - block.timestamp;
     }
 
-    function showProgress(uint _offset, uint _limit) external view returns(uint[] memory, uint[] memory) {
+    function showProgress(uint _offset, uint _limit) external view onlyActive returns(uint[] memory, uint[] memory) {
         require(_limit > 0, "Limit must be greater than zero!");
-        require(state == VotingState.Active, "Voting not active!");
 
         uint totalCandidates = candidateAddresses.length;
         uint endIndex = _offset + _limit;
@@ -121,9 +150,8 @@ contract Voting is Ownable {
         return (candidateIds, total);
     }
 
-    function showResult(uint _offset, uint _limit) external view returns (uint[] memory, uint[] memory) {
+    function showResult(uint _offset, uint _limit) external view onlyEnded returns (uint[] memory, uint[] memory) {
         require(_limit > 0, "Limit must be greater than zero!");
-        require(state == VotingState.Closed, "Voting not closed yet!");
         
         uint totalCandidates = candidateAddresses.length;
         uint endIndex = _offset + _limit;
