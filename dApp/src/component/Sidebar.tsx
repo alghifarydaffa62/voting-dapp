@@ -1,17 +1,9 @@
-import { useAccount, useDisconnect } from "wagmi"
+import { useDisconnect } from "wagmi"
 import { useNavigate } from "react-router-dom"
-import { useEffect } from "react"
 
-export default function Dashboard() {
-    const { address, isConnected } = useAccount()
+export default function Sidebar() {
     const { disconnect } = useDisconnect()
     const navigate = useNavigate()
-
-    useEffect(() => {
-        if(!isConnected) {
-            navigate('/')
-        }
-    }, [isConnected, navigate])
 
     const handleLogout = () => {
         disconnect()
@@ -20,8 +12,14 @@ export default function Dashboard() {
 
     return(
         <div>
-            <h1 className="text-center text-3xl font-semibold">DASHBOARD</h1>
-            <h1 className="text-xl">Connected address: {address}</h1>
+            <h1 className="text-2xl font-semibold">Voting</h1>
+
+            <ul className="flex flex-col gap-3 my-6">
+                <li><a href="">Dashboard</a></li>
+                <li><a href="">Create Voting</a></li>
+                <li><a href="">My Voting</a></li>
+                <li><a href="">Result</a></li>
+            </ul>
 
             <button 
                 onClick={handleLogout}
