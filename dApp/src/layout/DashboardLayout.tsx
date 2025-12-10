@@ -19,7 +19,7 @@ export default function DashboardLayout() {
         <div className="flex justify-center gap-20  bg-gray-50">
             <Sidebar />
 
-            <div className="p-5 w-[45vw]">
+            <div className="p-5 w-[55vw]">
                 <Outlet /> 
             </div>
         </div>
