@@ -1,9 +1,27 @@
-import { useState } from "react"
+import { useCreateVoting } from "../hooks/useCreateVoting"
+import { Loader2, CheckCircle } from "lucide-react";
 
 export default function CreateVotingForm() {
-    const [title, setTitle] = useState("")
-    const [desc, setDesc] = useState("")
+    const {
+        title, setTitle,
+        desc, setDesc,
+        createVoting,
+        isLoading, 
+        isSuccess,
+        txHash
+    } = useCreateVoting()
     
+    if (isSuccess) {
+        return (
+            <div className="bg-green-50 p-8 rounded-2xl text-center border border-green-200">
+                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-green-800">Voting Creation succedd</h2>
+                <p className="text-green-600 mt-2 break-all">Tx Hash: {txHash}</p>
+                
+            </div>
+        );
+    }
+
     return(
         <div>
             <h1 className="text-2xl font-semibold mb-5">Create new voting</h1>
@@ -31,10 +49,19 @@ export default function CreateVotingForm() {
                     />
                 </div>
 
-                <button 
-                    type="submit" 
-                    className="p-3 bg-blue-500 text-white font-semibold text-lg rounded-lg cursor-pointer max-w-lg"
-                >Create Voting</button>
+                <button
+                    onClick={createVoting}
+                    disabled={isLoading || !title || !desc}
+                    className="cursor-pointer w-full bg-amber-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-amber-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                    >
+                    {isLoading ? (
+                        <>
+                            <Loader2 className="animate-spin" /> Processing...
+                        </>
+                    ) : (
+                        "🚀 Deploy Voting ke Blockchain"
+                    )}
+                </button>
             </form>
         </div>
         

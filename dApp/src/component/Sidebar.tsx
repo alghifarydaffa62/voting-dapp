@@ -66,7 +66,7 @@ export default function Sidebar() {
                     Create Voting
                 </NavLink>
 
-                <NavLink to="/dashboard/my-campaigns" className={getLinkClass}>
+                <NavLink to="/dashboard/MyCampaigns" className={getLinkClass}>
                     <FileText size={20} />
                     My Campaigns
                 </NavLink>
