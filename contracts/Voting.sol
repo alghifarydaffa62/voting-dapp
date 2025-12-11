@@ -52,17 +52,29 @@ contract Voting is Ownable {
         _;
     }
 
-    function registerVoter(address _voterAdd) external onlyOwner onlyPending() {
-        require(!voters[_voterAdd].isRegistered, "Voter already registered!");
-        require(_voterAdd != address(0), "Address invalid!");
+    function registerInternal(address _voter) private returns(bool) {
+        if(_voter == address(0) || voters[_voter].isRegistered) {
+            return false;
+        }
 
-        voters[_voterAdd] = Voter({
+        voters[_voter] = Voter({
             votedCandidate: 0,
             hasVoted: false,
             isRegistered: true
         });
+        emit registerVoterSuccess(msg.sender, _voter);
+        return true;
+    }
 
-        emit registerVoterSuccess(msg.sender, _voterAdd);
+    function registerVoter(address _voter) external onlyOwner onlyPending {
+        bool success = registerInternal(_voter);
+        require(success, "Invalid address or already registered!");
+    }
+
+    function registerVoterBatch(address[] calldata _voters) external onlyOwner onlyPending {
+        for(uint i = 0; i < _voters.length; i++) {
+            registerInternal(_voters[i]);
+        }
     }
 
     function registerCandidate(address _candidateAdd) external onlyOwner onlyPending {
