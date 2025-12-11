@@ -34,8 +34,8 @@ export default defineConfig({
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: process.env.ALCHEMY_RPC_URL!,
-      accounts: [process.env.WALLET_PRIVATE_KEY!],
+      url: process.env.ALCHEMY_RPC_URL || "",
+      accounts: process.env.WALLET_PRIVATE_KEY ? [process.env.WALLET_PRIVATE_KEY] : [],
     },
   },
 });
