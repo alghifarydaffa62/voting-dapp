@@ -37,8 +37,8 @@ export default defineConfig({
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: RPC_URL!,
-      accounts: [PRIVATE_KEY!],
+      url: RPC_URL || "",
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },
   },
 });
