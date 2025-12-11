@@ -61,7 +61,7 @@ describe("Voting Testing", function () {
 
       await expect(
         voting.registerVoter(await addr1.getAddress())
-      ).to.be.revertedWith("Voter already registered!");
+      ).to.be.revertedWith("Invalid address or already registered!");
     });
 
     it("Sad Path: Should REVERT if non-owner tries to register a voter", async () => {
@@ -73,7 +73,7 @@ describe("Voting Testing", function () {
     it("Sad Path: Should REVERT if trying to register the zero address", async () => {
       await expect(
         voting.registerVoter(ethers.ZeroAddress)
-      ).to.be.revertedWith("Address invalid!");
+      ).to.be.revertedWith("Invalid address or already registered!");
     })
 
     it("Sad Path: Should REVERT if owner tries to register after voting has started", async () => {

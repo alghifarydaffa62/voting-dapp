@@ -53,7 +53,7 @@ contract Voting is Ownable {
     }
 
     function registerInternal(address _voter) private returns(bool) {
-        if(_voter != address(0) || !voters[_voter].isRegistered) {
+        if(_voter == address(0) || voters[_voter].isRegistered) {
             return false;
         }
 
