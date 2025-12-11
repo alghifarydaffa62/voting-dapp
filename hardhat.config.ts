@@ -1,8 +1,11 @@
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
-import { configVariable, defineConfig } from "hardhat/config";
+import { defineConfig } from "hardhat/config";
 import * as dotenv from "dotenv"
 
 dotenv.config()
+
+const RPC_URL = process.env.ALCHEMY_RPC_URL;
+const PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY;
 
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthersPlugin],
@@ -34,8 +37,8 @@ export default defineConfig({
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: process.env.ALCHEMY_RPC_URL || "",
-      accounts: process.env.WALLET_PRIVATE_KEY ? [process.env.WALLET_PRIVATE_KEY] : [],
+      url: RPC_URL!,
+      accounts: [PRIVATE_KEY!],
     },
   },
 });
